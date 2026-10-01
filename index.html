@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  
+<meta charset="UTF-8">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="canonical" href="https://upliftorch.com/tools/edu-map/">
+<link rel="alternate" hreflang="zh-TW" href="https://upliftorch.com/tools/edu-map/">
+<link rel="alternate" hreflang="en" href="https://upliftorch.com/tools/edu-map/en/">
+<link rel="alternate" hreflang="x-default" href="https://upliftorch.com/tools/edu-map/en/">
+<title>台灣教育資源地圖 — 學校、圖書館一站查詢</title>
+<meta name="description" content="搜尋全台 10,000+ 所學校與 5,200+ 間圖書館、128 座博物館，在地圖上瀏覽幼兒園、國小、國中、高中、大學與公共圖書館資訊。">
+<meta name="robots" content="index, follow">
+<meta property="og:title" content="台灣教育資源地圖">
+<meta property="og:description" content="全台學校與圖書館在地圖上一站查詢">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --primary:#1a73e8;--primary-dark:#1557b0;--bg:#f8f9fa;--card:#fff;
+  --text:#202124;--text-secondary:#5f6368;--border:#dadce0;
+  --kinder:#9c27b0;--elem:#4285f4;--junior:#34a853;--high:#fbbc04;--uni:#ff6d00;--exp:#00bcd4;--lib:#ea4335;--museum:#795548;--special:#e91e63;--cram:#607d8b;--sports:#00897b;--infant:#f06292;
+  --radius:12px;--shadow:0 1px 3px rgba(0,0,0,.12),0 1px 2px rgba(0,0,0,.08);
+}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.6}
+a{color:var(--primary);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* Header */
+.header{background:var(--primary);color:#fff;padding:0 20px;position:sticky;top:0;z-index:1000;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.header-inner{max-width:100%;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:50px;padding:0 8px}
+.logo{font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px;margin:0}
+.logo svg{width:22px;height:22px;fill:#fff}
+.header-center{display:flex;align-items:center;gap:8px;flex:1;max-width:480px;margin:0 16px}
+.header-search{flex:1;padding:7px 14px;border:none;border-radius:20px;font-size:14px;background:rgba(255,255,255,.2);color:#fff;outline:none}
+.header-search::placeholder{color:rgba(255,255,255,.7)}
+.header-search:focus{background:rgba(255,255,255,.95);color:var(--text)}
+.header-search:focus::placeholder{color:#9aa0a6}
+.header-actions{display:flex;align-items:center;gap:8px}
+.lang-switch{color:rgba(255,255,255,.85);font-size:12px;padding:3px 10px;border:1px solid rgba(255,255,255,.4);border-radius:16px}
+.lang-switch:hover{background:rgba(255,255,255,.15);text-decoration:none}
+
+/* Filter bar */
+.filter-bar{background:var(--card);border-bottom:1px solid var(--border);padding:6px 16px;display:flex;align-items:center;gap:8px;overflow-x:auto;z-index:900;position:sticky;top:50px}
+.filter-chip{padding:5px 14px;border-radius:20px;border:1px solid var(--border);font-size:12px;cursor:pointer;background:var(--card);transition:all .15s;user-select:none;white-space:nowrap;flex-shrink:0}
+.filter-chip:hover{border-color:var(--primary)}
+.filter-chip.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.chip-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle}
+
+/* App layout: map + sidebar */
+.app{display:flex;height:calc(100vh - 50px - 37px);overflow:hidden}
+.map-container{flex:1;position:relative}
+#map{width:100%;height:100%}
+.map-overlay{position:absolute;top:12px;left:12px;z-index:800;display:flex;flex-direction:column;gap:8px}
+.all-taiwan-btn{padding:8px 16px;border:none;border-radius:var(--radius);background:var(--primary);color:#fff;font-size:13px;font-weight:600;cursor:pointer;box-shadow:var(--shadow);transition:background .15s}
+.all-taiwan-btn:hover{background:var(--primary-dark)}
+.city-dropdown{position:relative}
+.city-dropdown select{padding:8px 32px 8px 12px;border:none;border-radius:var(--radius);background:var(--card);box-shadow:var(--shadow);font-size:13px;cursor:pointer;appearance:none;-webkit-appearance:none;min-width:120px;outline:none}
+.city-dropdown::after{content:'';position:absolute;right:12px;top:50%;transform:translateY(-50%);border:4px solid transparent;border-top-color:var(--text-secondary);pointer-events:none}
+.district-dropdown select{padding:8px 32px 8px 12px;border:none;border-radius:var(--radius);background:var(--card);box-shadow:var(--shadow);font-size:13px;cursor:pointer;appearance:none;-webkit-appearance:none;min-width:100px;outline:none}
+.district-dropdown{position:relative;display:none}
+.district-dropdown::after{content:'';position:absolute;right:12px;top:50%;transform:translateY(-50%);border:4px solid transparent;border-top-color:var(--text-secondary);pointer-events:none}
+
+/* Sidebar list */
+.sidebar{width:380px;background:var(--card);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.sidebar-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.sidebar-header h3{font-size:14px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sidebar-count{font-size:12px;color:var(--text-secondary);flex-shrink:0}
+.sidebar-arrow{display:none;font-size:12px;color:var(--text-secondary);flex-shrink:0;transition:transform .3s}
+.sidebar-search{display:none}
+.sidebar-toggle{display:none;position:absolute;right:12px;bottom:80px;z-index:800;width:44px;height:44px;border-radius:50%;background:var(--card);box-shadow:0 2px 8px rgba(0,0,0,.2);border:none;cursor:pointer;font-size:18px}
+.school-list{flex:1;overflow-y:auto;padding:0}
+.school-item{padding:12px 16px;border-bottom:1px solid #f1f3f4;cursor:pointer;display:flex;gap:12px;transition:background .1s}
+.school-item:hover,.school-item.active{background:#e8f0fe}
+.school-item .s-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.s-icon.kindergarten{background:#f3e5f5}
+.s-icon.elementary{background:#e8f0fe}
+.s-icon.junior{background:#e6f4ea}
+.s-icon.high{background:#fef7e0}
+.s-icon.university{background:#fff3e0}
+.s-icon.experimental{background:#e0f7fa}
+.s-icon.library{background:#fce8e6}
+.s-icon.museum{background:#efebe9}
+.s-icon.special{background:#fce4ec}
+.s-icon.cram{background:#eceff1}
+.s-icon.sports{background:#e0f2f1}
+.s-icon.infant{background:#fce4ec}
+.school-item .s-info{flex:1;min-width:0}
+.s-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.s-addr{font-size:11px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.s-tags{display:flex;gap:4px;margin-top:3px}
+.s-tag{font-size:10px;padding:1px 6px;border-radius:8px;background:#f1f3f4;color:var(--text-secondary)}
+.s-tag.public{background:#e6f4ea;color:#137333}
+.s-tag.private{background:#fef7e0;color:#b06000}
+
+/* Empty state */
+.empty-state{text-align:center;padding:40px 20px;color:var(--text-secondary)}
+
+/* Popup */
+.leaflet-popup-content{min-width:200px}
+.popup-title{font-size:14px;font-weight:600;margin-bottom:4px}
+.popup-meta{font-size:12px;color:var(--text-secondary);margin-bottom:6px}
+.popup-stats{display:flex;gap:12px;margin:8px 0;font-size:12px}
+.popup-stats .ps{text-align:center}
+.popup-stats .ps-num{font-size:16px;font-weight:700;color:var(--primary)}
+.popup-stats .ps-lbl{font-size:10px;color:var(--text-secondary)}
+.popup-tags{display:flex;gap:4px;margin:6px 0}
+.popup-tag{font-size:10px;padding:2px 8px;border-radius:8px}
+.popup-tag.public{background:#e6f4ea;color:#137333}
+.popup-tag.private{background:#fef7e0;color:#b06000}
+.popup-tag.default{background:#f1f3f4;color:#5f6368}
+.popup-tag.remote-tag{background:#e3f2fd;color:#1565c0}
+.popup-tag.open-tag{background:#e8f5e9;color:#2e7d32}
+.s-tag.shuttle{background:#e8f5e9;color:#2e7d32}
+.popup-penalty{margin:6px 0;padding:6px 8px;background:#fff3e0;border-left:3px solid #ff6d00;border-radius:4px;font-size:11px}
+.popup-penalty .pen-title{font-weight:600;color:#e65100;margin-bottom:2px}
+.popup-penalty .pen-item{color:var(--text-secondary);margin:2px 0;line-height:1.3}
+.s-tag.penalty{background:#fff3e0;color:#e65100}
+.s-tag.clean{background:#e8f5e9;color:#2e7d32}
+.s-tag.remote{background:#e3f2fd;color:#1565c0}
+.s-tag.exp{background:#e0f7fa;color:#00695c}
+.popup-actions{margin-top:8px;display:flex;gap:6px}
+.popup-btn{padding:4px 10px;border-radius:12px;border:none;cursor:pointer;font-size:11px}
+.popup-btn.primary{background:var(--primary);color:#fff}
+.popup-btn.outline{border:1px solid var(--border);background:#fff}
+
+/* Filter panel (replaces horizontal scroll on mobile) */
+.filter-toggle{display:none}
+.filter-active-tags{display:none}
+.filter-reset-btn{display:none}
+.filter-panel{display:none}
+.edu-tab-bar{display:none}
+
+/* Mobile */
+@media(max-width:768px){
+  .header-inner{height:46px}
+  .logo span{font-size:14px}
+  .header-actions{display:none}
+  .header-center{max-width:none;margin:0 8px}
+  .filter-bar{top:46px;padding:6px 12px;overflow:visible}
+  .filter-bar .filter-chip{display:none}
+  .filter-toggle{display:flex;padding:6px 14px;border-radius:20px;border:1px solid var(--border);font-size:12px;cursor:pointer;background:var(--card);align-items:center;gap:6px;font-weight:600;color:var(--text)}
+  .filter-toggle:hover{border-color:var(--primary)}
+  .filter-toggle .ft-arrow{font-size:10px;transition:transform .2s}
+  .filter-toggle.open .ft-arrow{transform:rotate(180deg)}
+  .filter-active-tags{display:flex;gap:4px;flex:1;overflow-x:auto;align-items:center}
+  .filter-active-tag{padding:3px 8px;border-radius:12px;font-size:10px;background:var(--primary);color:#fff;white-space:nowrap;display:flex;align-items:center;gap:3px;cursor:pointer}
+  .filter-active-tag .tag-x{opacity:.7;font-size:12px}
+  .filter-reset-btn{display:none;font-size:10px;color:var(--primary);cursor:pointer;white-space:nowrap;padding:4px 6px}
+  .filter-reset-btn.show{display:block}
+  .filter-panel{position:absolute;top:100%;left:0;right:0;background:var(--card);border-bottom:1px solid var(--border);box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:899;padding:14px 16px;max-height:55vh;overflow-y:auto}
+  .filter-panel.show{display:block}
+  .fp-group{margin-bottom:12px}
+  .fp-group-title{font-size:10px;font-weight:600;color:var(--text-secondary);letter-spacing:.5px;margin-bottom:6px;text-transform:uppercase}
+  .fp-options{display:flex;flex-wrap:wrap;gap:6px}
+  .fp-options .filter-chip{display:inline-flex !important}
+  .map-overlay{display:none}
+  .sidebar{position:fixed;bottom:52px;left:0;right:0;width:100%;height:50vh;z-index:900;border-top:2px solid var(--border);border-left:none;transform:translateY(calc(100% - 48px));transition:transform .3s ease}
+  .sidebar.open{transform:translateY(0)}
+  .sidebar-header{cursor:pointer}
+  .sidebar-toggle{display:none}
+  .sidebar-arrow{display:block}
+  .sidebar.open .sidebar-arrow{transform:rotate(180deg)}
+  .sidebar-search{display:none}
+  .leaflet-popup{display:none !important}
+  .app{height:calc(100vh - 46px - 38px - 48px - 52px)}
+  .edu-tab-bar{display:flex;position:fixed;bottom:0;left:0;right:0;height:52px;background:var(--card);border-top:1px solid var(--border);z-index:1000;align-items:stretch;box-shadow:0 -2px 8px rgba(0,0,0,.06)}
+  .edu-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:var(--text-secondary);cursor:pointer;border:none;background:none;-webkit-tap-highlight-color:transparent}
+  .edu-tab.active{color:var(--primary)}
+  .edu-tab .tab-icon{display:block;width:22px;height:22px}
+  .edu-tab .tab-icon svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+}
+
+/* Marker colors */
+.marker-elem{background:var(--elem)}
+.marker-junior{background:var(--junior)}
+.marker-high{background:var(--high)}
+.marker-lib{background:var(--lib)}
+.custom-marker{width:28px;height:28px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 2px 6px rgba(0,0,0,.3);color:#fff;font-weight:700}
+
+/* Loading overlay on map */
+.map-loading{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:800;background:var(--card);padding:16px 24px;border-radius:var(--radius);box-shadow:var(--shadow);display:none;align-items:center;gap:10px;font-size:14px}
+.map-loading.show{display:flex}
+.mini-spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Dark mode */
+@media(prefers-color-scheme:dark){
+  :root{
+    --primary:#8ab4f8;--primary-dark:#669df6;--bg:#1a1a2e;--card:#16213e;
+    --text:#e0e0e0;--text-secondary:#9e9e9e;--border:#2a2a4a;
+    --shadow:0 1px 3px rgba(0,0,0,.4),0 1px 2px rgba(0,0,0,.3);
+  }
+  .header{background:#0f3460;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+  .header-search{background:rgba(255,255,255,.1);color:#e0e0e0}
+  .header-search:focus{background:#1a1a2e;color:#e0e0e0}
+  .header-search:focus::placeholder{color:#777}
+  .lang-switch{color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.25)}
+  .filter-chip{background:var(--card);color:var(--text);border-color:var(--border)}
+  .filter-chip.active{background:var(--primary);color:#1a1a2e;border-color:var(--primary)}
+  .school-item{border-bottom-color:var(--border)}
+  .school-item:hover,.school-item.active{background:#1a3a5c}
+  .s-icon.kindergarten{background:#4a1a5e}
+  .s-icon.elementary{background:#1a3a6e}
+  .s-icon.junior{background:#1a4a2e}
+  .s-icon.high{background:#4a3a0a}
+  .s-icon.university{background:#4a2a0a}
+  .s-icon.experimental{background:#0a3a4a}
+  .s-icon.library{background:#4a1a1a}
+  .s-icon.museum{background:#3a2a1a}
+  .s-icon.special{background:#4a1a2a}
+  .s-icon.cram{background:#2a2a3a}
+  .s-icon.sports{background:#0a3a2a}
+  .s-icon.infant{background:#4a1a2a}
+  .s-tag{background:#2a2a4a;color:#d0d0d0}
+  .s-tag.public{background:#1a3a2a;color:#66bb6a}
+  .s-tag.private{background:#3a2a0a;color:#ffb74d}
+  .s-tag.penalty{background:#3a2a0a;color:#ff8a65}
+  .s-tag.clean{background:#1a3a2a;color:#66bb6a}
+  .s-tag.remote{background:#1a2a4a;color:#64b5f6}
+  .s-tag.exp{background:#0a3a3a;color:#4dd0e1}
+  .popup-penalty{background:#3a2a0a;border-left-color:#ff8a65}
+  .popup-penalty .pen-title{color:#ff8a65}
+  .popup-tag.public{background:#1a3a2a;color:#66bb6a}
+  .popup-tag.private{background:#3a2a0a;color:#ffb74d}
+  .popup-tag.default{background:#2a2a4a;color:#d0d0d0}
+  .popup-tag.remote-tag{background:#1a2a4a;color:#64b5f6}
+  .popup-tag.open-tag{background:#1a3a2a;color:#66bb6a}
+  .s-tag.shuttle{background:#1a3a2a;color:#66bb6a}
+  .popup-btn.outline{background:var(--card);border-color:var(--border);color:var(--text)}
+  .city-dropdown select,.district-dropdown select{background:var(--card);color:var(--text)}
+  .custom-marker{border-color:#2a2a4a}
+  .leaflet-popup-content-wrapper{background:var(--card);color:var(--text)}
+  .leaflet-popup-tip{background:var(--card)}
+  .leaflet-control-zoom a{background:var(--card);color:var(--text);border-color:var(--border)}
+  .leaflet-control-zoom a:hover{background:#1a3a5c}
+  .leaflet-control-attribution{background:rgba(22,33,62,.8)!important;color:#9e9e9e}
+  .leaflet-control-attribution a{color:#8ab4f8}
+  .marker-cluster div{background:rgba(138,180,248,.7);color:#1a1a2e}
+  .marker-cluster{background:rgba(138,180,248,.3)}
+  /* Invert map tiles for dark appearance */
+  .leaflet-tile-pane{filter:brightness(0.7) invert(1) contrast(1.2) hue-rotate(200deg) saturate(0.3) brightness(0.8)}
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <h1 class="logo">
+      <svg viewBox="0 0 24 24"><path d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3zm6.82 6L12 12.72 5.18 9 12 5.28 18.82 9zM17 15.99l-5 2.73-5-2.73v-3.72L12 15l5-2.73v3.72z"/></svg>
+      <span>教育資源地圖</span>
+    </h1>
+    <div class="header-center">
+      <input type="text" class="header-search" id="searchInput" placeholder="搜尋學校、圖書館名稱或地址...">
+    </div>
+    <div class="header-actions">
+      <a href="en/index.html" class="lang-switch">EN</a>
+    </div>
+  </div>
+</header>
+
+<div class="filter-bar" id="filterBar">
+  <!-- Mobile: toggle + active tags -->
+  <div class="filter-toggle" id="eduFilterToggle">篩選 <span class="ft-arrow">▾</span></div>
+  <div class="filter-active-tags" id="eduFilterTags"><span style="font-size:11px;color:var(--text-secondary)">全部類型</span></div>
+  <div class="filter-reset-btn" id="eduFilterReset">清除</div>
+  <!-- Desktop: inline chips (hidden on mobile by CSS) -->
+  <span class="filter-chip active" data-filter="all">全部</span>
+  <span class="filter-chip" data-filter="kindergarten"><span class="chip-dot" style="background:var(--kinder)"></span>幼兒園</span>
+  <span class="filter-chip" data-filter="penalty" style="border-color:#ff6d00"><span class="chip-dot" style="background:#ff6d00"></span>幼兒園裁罰</span>
+  <span class="filter-chip" data-filter="shuttle" style="border-color:#43a047"><span class="chip-dot" style="background:#43a047"></span>娃娃車</span>
+  <span class="filter-chip" data-filter="elementary"><span class="chip-dot" style="background:var(--elem)"></span>國小</span>
+  <span class="filter-chip" data-filter="junior"><span class="chip-dot" style="background:var(--junior)"></span>國中</span>
+  <span class="filter-chip" data-filter="high"><span class="chip-dot" style="background:var(--high)"></span>高中職</span>
+  <span class="filter-chip" data-filter="university"><span class="chip-dot" style="background:var(--uni)"></span>大學</span>
+  <span class="filter-chip" data-filter="experimental"><span class="chip-dot" style="background:var(--exp)"></span>實驗教育</span>
+  <span class="filter-chip" data-filter="library"><span class="chip-dot" style="background:var(--lib)"></span>圖書館</span>
+  <span class="filter-chip" data-filter="museum"><span class="chip-dot" style="background:var(--museum)"></span>博物館</span>
+  <span class="filter-chip" data-filter="special"><span class="chip-dot" style="background:var(--special)"></span>特教學校</span>
+  <span class="filter-chip" data-filter="cram"><span class="chip-dot" style="background:var(--cram)"></span>補習班</span>
+  <span class="filter-chip" data-filter="sports"><span class="chip-dot" style="background:var(--sports)"></span>運動場館</span>
+  <span class="filter-chip" data-filter="infant"><span class="chip-dot" style="background:var(--infant)"></span>托嬰中心</span>
+  <span class="filter-chip" data-filter="hasInfant" style="border-color:#e91e63"><span class="chip-dot" style="background:#e91e63"></span>可托嬰</span>
+  <!-- Mobile filter panel -->
+  <div class="filter-panel" id="eduFilterPanel">
+    <div class="fp-group"><div class="fp-group-title">學校</div><div class="fp-options">
+      <span class="filter-chip" data-filter="kindergarten"><span class="chip-dot" style="background:var(--kinder)"></span>幼兒園</span>
+      <span class="filter-chip" data-filter="elementary"><span class="chip-dot" style="background:var(--elem)"></span>國小</span>
+      <span class="filter-chip" data-filter="junior"><span class="chip-dot" style="background:var(--junior)"></span>國中</span>
+      <span class="filter-chip" data-filter="high"><span class="chip-dot" style="background:var(--high)"></span>高中職</span>
+      <span class="filter-chip" data-filter="university"><span class="chip-dot" style="background:var(--uni)"></span>大學</span>
+      <span class="filter-chip" data-filter="experimental"><span class="chip-dot" style="background:var(--exp)"></span>實驗教育</span>
+      <span class="filter-chip" data-filter="special"><span class="chip-dot" style="background:var(--special)"></span>特教學校</span>
+    </div></div>
+    <div class="fp-group"><div class="fp-group-title">設施</div><div class="fp-options">
+      <span class="filter-chip" data-filter="library"><span class="chip-dot" style="background:var(--lib)"></span>圖書館</span>
+      <span class="filter-chip" data-filter="museum"><span class="chip-dot" style="background:var(--museum)"></span>博物館</span>
+      <span class="filter-chip" data-filter="sports"><span class="chip-dot" style="background:var(--sports)"></span>運動場館</span>
+      <span class="filter-chip" data-filter="cram"><span class="chip-dot" style="background:var(--cram)"></span>補習班</span>
+      <span class="filter-chip" data-filter="infant"><span class="chip-dot" style="background:var(--infant)"></span>托嬰中心</span>
+    </div></div>
+    <div class="fp-group"><div class="fp-group-title">特殊條件</div><div class="fp-options">
+      <span class="filter-chip" data-filter="penalty" style="border-color:#ff6d00"><span class="chip-dot" style="background:#ff6d00"></span>幼兒園裁罰</span>
+      <span class="filter-chip" data-filter="shuttle" style="border-color:#43a047"><span class="chip-dot" style="background:#43a047"></span>娃娃車</span>
+      <span class="filter-chip" data-filter="hasInfant" style="border-color:#e91e63"><span class="chip-dot" style="background:#e91e63"></span>可托嬰</span>
+    </div></div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="map-container">
+    <div id="map"></div>
+    <div class="map-overlay">
+      <button class="all-taiwan-btn" id="allTaiwanBtn">全台灣</button>
+      <div class="city-dropdown">
+        <select id="citySelect"><option value="">選擇縣市</option></select>
+      </div>
+      <div class="district-dropdown" id="districtDropdown">
+        <select id="districtSelect"><option value="">全部區域</option></select>
+      </div>
+    </div>
+    <div class="map-loading" id="mapLoading"><div class="mini-spinner"></div><span>載入資料中...</span></div>
+  </div>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header" id="sidebarHeader">
+      <h3 id="sidebarTitle">教育資源</h3>
+      <span class="sidebar-count" id="sidebarCount"></span>
+      <span class="sidebar-arrow" id="sidebarArrow">&#9650;</span>
+    </div>
+    <input type="hidden" id="sidebarSearchInput">
+    <div class="school-list" id="schoolList">
+      <div class="empty-state">選擇縣市或搜尋以顯示資源</div>
+    </div>
+  </aside>
+
+  <button class="sidebar-toggle" id="sidebarToggle">&#9650;</button>
+</div>
+
+<!-- Bottom tab bar (mobile) -->
+<nav class="edu-tab-bar" id="eduTabBar">
+  <button class="edu-tab active" data-action="map"><span class="tab-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 5.4 8 12 8 12s8-6.6 8-12a8 8 0 0 0-8-8z"/></svg></span>地圖</button>
+  <button class="edu-tab" data-action="city"><span class="tab-icon"><svg viewBox="0 0 24 24"><rect x="3" y="10" width="6" height="11" rx="1"/><rect x="9" y="3" width="6" height="18" rx="1"/><rect x="15" y="7" width="6" height="14" rx="1"/></svg></span>縣市</button>
+  <button class="edu-tab" data-action="about"><span class="tab-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><circle cx="12" cy="8" r=".5"/></svg></span>關於</button>
+</nav>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+(function(){
+'use strict';
+
+let DATA = null;
+let COORDS = {};
+let map = null;
+let markerGroup = null;
+let currentFilters = new Set(['all']);
+let currentCity = '';
+let currentDistrict = '';
+let activeMarker = null;
+let searchTimeout = null;
+let sidebarItems = []; // current items displayed in sidebar (may be filtered)
+let allSidebarItems = [];
+
+const TYPE_LABELS = { kindergarten:'幼兒園', elementary:'國小', junior:'國中', high:'高中職', university:'大學', experimental:'實驗教育', library:'圖書館', museum:'博物館', special:'特教學校', cram:'補習班', sports:'運動場館', infant:'托嬰中心', shuttle:'娃娃車', penalty:'幼兒園裁罰', hasInfant:'可托嬰' };
+const TYPE_ICONS = { kindergarten:'💒', elementary:'🏫', junior:'🏫', high:'🎓', university:'🎓', experimental:'🧪', library:'📚', museum:'🏛', special:'♿', cram:'📝', sports:'🏟', infant:'👶' };
+const TYPE_HEX = { kindergarten:'#9c27b0', elementary:'#4285f4', junior:'#34a853', high:'#fbbc04', university:'#ff6d00', experimental:'#00bcd4', library:'#ea4335', museum:'#795548', special:'#e91e63', cram:'#607d8b', sports:'#00897b', infant:'#f06292' };
+const CITY_CENTERS = {
+  '臺北市':[25.033,121.565],'新北市':[25.012,121.465],'基隆市':[25.128,121.739],
+  '桃園市':[24.994,121.301],'新竹市':[24.804,120.969],'新竹縣':[24.839,121.017],
+  '苗栗縣':[24.560,120.821],'臺中市':[24.148,120.674],'彰化縣':[24.076,120.542],
+  '南投縣':[23.910,120.684],'雲林縣':[23.710,120.432],'嘉義市':[23.480,120.449],
+  '嘉義縣':[23.452,120.256],'臺南市':[22.999,120.227],'高雄市':[22.627,120.301],
+  '屏東縣':[22.552,120.549],'宜蘭縣':[24.752,121.753],'花蓮縣':[23.991,121.601],
+  '臺東縣':[22.756,121.144],'澎湖縣':[23.571,119.579],'金門縣':[24.449,118.377],
+  '連江縣':[26.160,119.950]
+};
+
+// === Hash function for deterministic offset ===
+function hashStr(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) { h = ((h << 5) - h + s.charCodeAt(i)) | 0; }
+  return h;
+}
+
+function getCoords(item) {
+  if (item.lat && item.lng) return [item.lat, item.lng];
+  const key = `${item.city}|${item.district}`;
+  const coordObj = COORDS[key];
+  const cityArr = CITY_CENTERS[item.city];
+  const baseLat = coordObj ? coordObj.lat : (cityArr ? cityArr[0] : 23.5);
+  const baseLng = coordObj ? coordObj.lng : (cityArr ? cityArr[1] : 121);
+  const h = hashStr(item.name || item.code || '');
+  const latOff = ((h & 0xfff) / 0xfff - 0.5) * 0.012;
+  const lngOff = (((h >> 12) & 0xfff) / 0xfff - 0.5) * 0.012;
+  return [baseLat + latOff, baseLng + lngOff];
+}
+
+// === Init ===
+async function init() {
+  document.getElementById('mapLoading').classList.add('show');
+
+  // Init map
+  map = L.map('map', { zoomControl: false }).setView([23.7, 120.96], 8);
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/">OSM</a> | 資料：<a href="https://data.gov.tw">政府開放資料</a>',
+    maxZoom: 18
+  }).addTo(map);
+
+  markerGroup = L.markerClusterGroup({
+    maxClusterRadius: 50,
+    spiderfyOnMaxZoom: true,
+    showCoverageOnHover: false,
+    iconCreateFunction: function(cluster) {
+      const count = cluster.getChildCount();
+      let size = 'small';
+      if (count > 50) size = 'large';
+      else if (count > 10) size = 'medium';
+      return L.divIcon({
+        html: `<div><span>${count}</span></div>`,
+        className: `marker-cluster marker-cluster-${size}`,
+        iconSize: L.point(40, 40)
+      });
+    }
+  });
+  map.addLayer(markerGroup);
+
+  // Load data
+  try {
+    const [dataResp, coordResp] = await Promise.all([
+      fetch('https://storage.googleapis.com/upliftorch_tool/edu-map/data/edu-data.json'),
+      fetch('https://storage.googleapis.com/upliftorch_tool/edu-map/data/district-coords.json').catch(() => ({ ok: false }))
+    ]);
+    DATA = await dataResp.json();
+    // Assign types to non-school data once at load
+    if (DATA.libraries) DATA.libraries.forEach(l => { l.type = 'library'; l.public = true; });
+    if (DATA.museums) DATA.museums.forEach(m => { m.type = 'museum'; m.public = true; });
+    if (DATA.sports) DATA.sports.forEach(s => { s.type = 'sports'; });
+    if (DATA.infant) DATA.infant.forEach(c => { c.type = 'infant'; });
+    if (coordResp.ok) {
+      COORDS = await coordResp.json();
+    }
+  } catch(e) {
+    console.error('Load failed:', e);
+  }
+
+  document.getElementById('mapLoading').classList.remove('show');
+  if (!DATA) return;
+
+  renderCityDropdown();
+  // Show Taiwan overview - markers for each city
+  showCityOverview();
+
+  // Events
+  document.getElementById('citySelect').addEventListener('change', onCityChange);
+  document.getElementById('districtSelect').addEventListener('change', onDistrictChange);
+  document.getElementById('allTaiwanBtn').addEventListener('click', onAllTaiwan);
+  // Mobile: tap map to close sidebar
+  map.on('click', function() {
+    if (window.innerWidth <= 768) {
+      document.getElementById('sidebar').classList.remove('open');
+    }
+  });
+  // Auto switch to all-Taiwan when zoomed out enough
+  map.on('zoomend', function() {
+    if (map.getZoom() <= 9 && currentCity) {
+      currentCity = '';
+      currentDistrict = '';
+      document.getElementById('citySelect').value = '';
+      document.getElementById('districtDropdown').style.display = 'none';
+      showCityOverview();
+    }
+  });
+}
+
+// === City dropdown ===
+function onAllTaiwan() {
+  currentCity = '';
+  currentDistrict = '';
+  document.getElementById('citySelect').value = '';
+  document.getElementById('districtDropdown').style.display = 'none';
+  document.getElementById('searchInput').value = '';
+  showCityOverview();
+  map.setView([23.7, 120.96], 8, { animate: true });
+}
+
+function renderCityDropdown() {
+  const sel = document.getElementById('citySelect');
+  sel.innerHTML = '<option value="">選擇縣市</option>';
+  DATA.cityOrder.forEach(city => {
+    if (!DATA.cityIndex[city]) return;
+    const count = Object.values(DATA.cityIndex[city]).reduce((s,d) => s + (d.kindergarten||0) + (d.elementary||0) + (d.junior||0) + (d.high||0) + (d.university||0) + (d.experimental||0) + (d.special||0) + (d.cram||0), 0);
+    sel.innerHTML += `<option value="${city}">${city} (${count})</option>`;
+  });
+}
+
+function renderDistrictDropdown(city) {
+  const wrap = document.getElementById('districtDropdown');
+  const sel = document.getElementById('districtSelect');
+  if (!city) { wrap.style.display = 'none'; return; }
+  const districts = DATA.cityIndex[city] || {};
+  sel.innerHTML = '<option value="">全部區域</option>';
+  Object.keys(districts).filter(d => d).sort().forEach(d => {
+    const cnt = districts[d];
+    const total = (cnt.kindergarten||0) + (cnt.elementary||0) + (cnt.junior||0) + (cnt.high||0) + (cnt.university||0) + (cnt.cram||0);
+    sel.innerHTML += `<option value="${d}">${d} (${total})</option>`;
+  });
+  wrap.style.display = 'block';
+}
+
+// === Events ===
+function onCityChange() {
+  currentCity = this.value;
+  currentDistrict = '';
+  renderDistrictDropdown(currentCity);
+  if (currentCity) {
+    showCityMarkers(currentCity);
+    const center = CITY_CENTERS[currentCity] || [23.7, 120.96];
+    map.setView(center, 12, { animate: true });
+  } else {
+    showCityOverview();
+    map.setView([23.7, 120.96], 8, { animate: true });
+  }
+}
+
+function onDistrictChange() {
+  currentDistrict = this.value;
+  if (currentDistrict) {
+    showDistrictMarkers(currentCity, currentDistrict);
+    // Zoom to district
+    const key = `${currentCity}|${currentDistrict}`;
+    const c = COORDS[key];
+    if (c) map.setView([c.lat, c.lng], 14, { animate: true });
+  } else {
+    showCityMarkers(currentCity);
+    const center = CITY_CENTERS[currentCity] || [23.7, 120.96];
+    map.setView(center, 12, { animate: true });
+  }
+}
+
+// === Show markers ===
+function showCityOverview() {
+  // When a specific filter is active, show actual markers instead of city bubbles
+  if (!currentFilters.has('all')) {
+    const items = getFilteredItems('', '');
+    renderMarkers(items);
+    updateSidebar(items);
+    return;
+  }
+  // Default: show city bubbles (lightweight overview)
+  markerGroup.clearLayers();
+  DATA.cityOrder.forEach(city => {
+    if (!DATA.cityIndex[city] || !CITY_CENTERS[city]) return;
+    const c = CITY_CENTERS[city];
+    const districts = DATA.cityIndex[city];
+    const total = Object.values(districts).reduce((s,d) => s + (d.kindergarten||0) + (d.elementary||0) + (d.junior||0) + (d.high||0) + (d.university||0) + (d.experimental||0) + (d.special||0) + (d.cram||0), 0);
+    const marker = L.marker(c, {
+      icon: L.divIcon({
+        className: '',
+        html: `<div style="background:var(--primary);color:#fff;padding:4px 10px;border-radius:16px;font-size:12px;font-weight:600;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.3)">${city} ${total}</div>`,
+        iconSize: [0, 0],
+        iconAnchor: [40, 12]
+      })
+    });
+    marker.on('click', () => {
+      document.getElementById('citySelect').value = city;
+      currentCity = city;
+      currentDistrict = '';
+      renderDistrictDropdown(city);
+      showCityMarkers(city);
+      map.setView(c, 12, { animate: true });
+    });
+    markerGroup.addLayer(marker);
+  });
+  // Defer sidebar data loading so map renders first
+  setTimeout(() => {
+    const items = getFilteredItems('', '');
+    updateSidebar(items);
+  }, 50);
+}
+
+function showCityMarkers(city) {
+  const items = getFilteredItems(city, '');
+  renderMarkers(items);
+  updateSidebar(items);
+}
+
+function showDistrictMarkers(city, district) {
+  const items = getFilteredItems(city, district);
+  renderMarkers(items);
+  updateSidebar(items);
+}
+
+function getFilteredItems(city, district) {
+  let items = [];
+  const f = currentFilters;
+  const isAll = f.has('all');
+  const NON_SCHOOL = ['library','museum','sports','infant'];
+  const hasPenalty = f.has('penalty');
+  const hasShuttle = f.has('shuttle');
+  const hasInfantFilter = f.has('hasInfant');
+  // School types to include
+  const schoolTypes = new Set();
+  f.forEach(t => { if (!NON_SCHOOL.includes(t) && t !== 'all' && t !== 'penalty' && t !== 'shuttle' && t !== 'hasInfant') schoolTypes.add(t); });
+  // Schools
+  if (isAll || schoolTypes.size > 0 || hasPenalty || hasShuttle) {
+    DATA.schools.forEach(s => {
+      if (city && s.city !== city) return;
+      if (district && s.district !== district) return;
+      if (isAll) { items.push(s); return; }
+      if (schoolTypes.has(s.type)) { items.push(s); return; }
+      if (hasPenalty && s.type === 'kindergarten' && s.hasPenalty) { items.push(s); return; }
+      if (hasShuttle && s.type === 'kindergarten' && s.hasShuttle) { items.push(s); return; }
+    });
+  }
+  // Libraries
+  if (isAll || f.has('library')) {
+    DATA.libraries.forEach(l => {
+      if (city && l.city !== city) return;
+      if (district && l.district !== district) return;
+      items.push(l);
+    });
+  }
+  if (isAll || f.has('museum')) {
+    (DATA.museums || []).forEach(m => {
+      if (city && m.city !== city) return;
+      items.push(m);
+    });
+  }
+  if (isAll || f.has('sports')) {
+    (DATA.sports || []).forEach(s => {
+      if (city && s.city !== city) return;
+      if (district && s.district !== district) return;
+      items.push(s);
+    });
+  }
+  if (isAll || f.has('infant') || hasInfantFilter) {
+    (DATA.infant || []).forEach(c => {
+      if (city && c.city !== city) return;
+      if (district && c.district !== district) return;
+      items.push(c);
+    });
+  }
+  return items;
+}
+
+function renderMarkers(items) {
+  markerGroup.clearLayers();
+  const max = 2000;
+  const display = items.slice(0, max);
+
+  display.forEach((item, idx) => {
+    const coords = getCoords(item);
+    const color = TYPE_HEX[item.type] || '#666';
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="custom-marker" style="background:${color}">${TYPE_ICONS[item.type]}</div>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+      popupAnchor: [0, -16]
+    });
+
+    const marker = L.marker(coords, { icon });
+    const isSchool = !['library','museum','sports','infant'].includes(item.type);
+    let popupHTML = `<div class="popup-title">${item.name}</div>`;
+    if (item.nameEn) popupHTML += `<div style="font-size:11px;color:var(--text-secondary);margin-bottom:2px">${item.nameEn}</div>`;
+    popupHTML += `<div class="popup-tags">`;
+    if (item.type !== 'cram' && item.type !== 'infant') popupHTML += `<span class="popup-tag ${item.public ? 'public' : 'private'}">${item.public ? '公立' : '私立'}</span> `;
+    popupHTML += `<span class="popup-tag" style="background:${color}20;color:${color}">${TYPE_LABELS[item.type]}</span>`;
+    if (item.subtype) popupHTML += ` <span class="popup-tag default">${item.subtype}</span>`;
+    if (item.category) popupHTML += ` <span class="popup-tag default">${item.category}</span>`;
+    if (item.remote) popupHTML += ` <span class="popup-tag remote-tag">${item.remote}</span>`;
+    if (item.openStatus) popupHTML += ` <span class="popup-tag open-tag">${item.openStatus}</span>`;
+    popupHTML += `</div>`;
+    popupHTML += `<div class="popup-meta">${item.address || ''}</div>`;
+    if (item.intro) popupHTML += `<div style="font-size:11px;color:var(--text-secondary);margin:4px 0">${item.intro}</div>`;
+    if (item.type === 'kindergarten') {
+      popupHTML += `<div class="popup-stats">`;
+      if (item.capacity) popupHTML += `<div class="ps"><div class="ps-num">${item.capacity}</div><div class="ps-lbl">核定人數</div></div>`;
+      if (item.monthly) popupHTML += `<div class="ps"><div class="ps-num">${item.monthly.toLocaleString()}</div><div class="ps-lbl">月費</div></div>`;
+      popupHTML += `</div>`;
+      if (item.hasPenalty && item.penalties && item.penalties.length > 0) {
+        popupHTML += `<div class="popup-penalty"><div class="pen-title">裁罰紀錄 (${item.penaltyCount} 筆)</div>`;
+        item.penalties.forEach(p => {
+          popupHTML += `<div class="pen-item">${p.date} — ${p.law}<br>${p.punishment}</div>`;
+        });
+        popupHTML += `</div>`;
+      }
+    } else if (item.type === 'infant' && item.capacity) {
+      popupHTML += `<div class="popup-stats"><div class="ps"><div class="ps-num">${item.capacity}</div><div class="ps-lbl">收托人數</div></div></div>`;
+    } else if (isSchool && item.students) {
+      popupHTML += `<div class="popup-stats"><div class="ps"><div class="ps-num">${item.students}</div><div class="ps-lbl">學生</div></div><div class="ps"><div class="ps-num">${item.classes}</div><div class="ps-lbl">班級</div></div><div class="ps"><div class="ps-num">${item.teachers}</div><div class="ps-lbl">教師</div></div></div>`;
+    }
+    popupHTML += `<div class="popup-actions"><a class="popup-btn primary" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address || item.name)}" target="_blank" rel="noopener">導航</a>`;
+    if (item.website) popupHTML += ` <a class="popup-btn outline" href="${item.website}" target="_blank" rel="noopener">官網</a>`;
+    popupHTML += `</div>`;
+
+    marker.bindPopup(popupHTML, { maxWidth: 280 });
+    marker.on('click', () => {
+      if (window.innerWidth <= 768) {
+        // Mobile: show info in bottom bar instead of popup
+        marker.closePopup();
+        const sidebar = document.getElementById('sidebar');
+        const listEl = document.getElementById('schoolList');
+        document.getElementById('sidebarTitle').textContent = item.name;
+        document.getElementById('sidebarCount').textContent = TYPE_LABELS[item.type] || '';
+        listEl.innerHTML = `<div style="padding:16px">${popupHTML}</div>`;
+        sidebar.classList.add('open');
+      } else {
+        highlightSidebarItem(idx);
+      }
+    });
+    marker._eduIdx = idx;
+    markerGroup.addLayer(marker);
+  });
+
+}
+
+// === Sidebar ===
+function updateSidebar(items) {
+  allSidebarItems = items;
+  sidebarItems = items;
+  // Clear sidebar search when data changes
+  const searchInput = document.getElementById('sidebarSearchInput');
+  if (searchInput) searchInput.value = '';
+  renderSidebarList(items);
+}
+
+function renderSidebarList(items) {
+  const el = document.getElementById('schoolList');
+  const titleEl = document.getElementById('sidebarTitle');
+  const countEl = document.getElementById('sidebarCount');
+
+  const isAll = currentFilters.has('all');
+  const filterNames = isAll ? '' : [...currentFilters].map(f => TYPE_LABELS[f] || f).join(' · ');
+  let title = isAll ? '教育資源' : filterNames;
+  if (currentCity) title = currentCity + (filterNames ? ' · ' + filterNames : '');
+  if (currentCity && currentDistrict) title = currentCity + ' ' + currentDistrict + (filterNames ? ' · ' + filterNames : '');
+  titleEl.textContent = title;
+
+  if (items.length === 0) {
+    let emptyMsg = '此區域無符合條件的資源';
+    if (currentFilters.has('infant') && currentFilters.size === 1) {
+      const infantCities = [...new Set((DATA.infant || []).map(i => i.city))];
+      const noDataCities = '基隆市、桃園市、苗栗縣、彰化縣、南投縣、雲林縣、嘉義市、嘉義縣、屏東縣、宜蘭縣、花蓮縣、臺東縣、澎湖縣、金門縣、連江縣';
+      emptyMsg = currentCity && !infantCities.includes(currentCity)
+        ? `${currentCity}尚無托嬰中心開放資料`
+        : '此區域無托嬰中心資料';
+      emptyMsg += `<div style="font-size:11px;color:var(--text-secondary);margin-top:8px;line-height:1.6">目前已收錄：臺北市、新北市、臺中市、臺南市、高雄市、新竹市、新竹縣<br><br>以下縣市尚未公開托嬰中心資料集：<br>${noDataCities}</div>`;
+    }
+    el.innerHTML = `<div class="empty-state">${emptyMsg}</div>`;
+    countEl.textContent = '';
+    return;
+  }
+
+  countEl.textContent = `${items.length} 筆`;
+  const max = 500;
+  const display = items.slice(0, max);
+
+  // Build index map for O(1) lookup instead of O(n) indexOf
+  const idxMap = new Map();
+  sidebarItems.forEach((item, i) => { if (!idxMap.has(item)) idxMap.set(item, i); });
+
+  el.innerHTML = display.map((item, idx) => {
+    const realIdx = idxMap.get(item) ?? idx;
+    const isSchool = !['library','museum','sports','infant'].includes(item.type);
+    return `<div class="school-item" data-idx="${realIdx}" onclick="panToMarker(${realIdx})">
+      <div class="s-info">
+        <div class="s-name">${item.name}</div>
+        <div class="s-addr">${item.address || ''}</div>
+        <div class="s-tags">
+          ${item.type !== 'cram' && item.type !== 'infant' ? `<span class="s-tag ${item.public ? 'public' : 'private'}">${item.public ? '公立' : '私立'}</span>` : ''}
+          ${isSchool && item.students ? `<span class="s-tag">${item.students}人</span>` : ''}
+          ${item.type === 'kindergarten' && item.hasPenalty && item.penaltyCount ? `<span class="s-tag penalty">有裁罰 ${item.penaltyCount}筆</span>` : ''}
+          ${item.type === 'kindergarten' && item.hasPenalty && !item.penaltyCount ? `<span class="s-tag penalty">有裁罰</span>` : ''}
+          ${item.type === 'kindergarten' && !item.hasPenalty ? `<span class="s-tag clean">無裁罰</span>` : ''}
+          ${item.type === 'kindergarten' && item.hasShuttle ? `<span class="s-tag shuttle">有娃娃車</span>` : ''}
+          ${item.type === 'kindergarten' && item.monthly ? `<span class="s-tag">$${item.monthly.toLocaleString()}/月</span>` : ''}
+          ${item.category ? `<span class="s-tag">${item.category}</span>` : ''}
+          ${item.type === 'infant' && item.capacity ? `<span class="s-tag">${item.capacity}人</span>` : ''}
+          ${item.type === 'infant' && item.subtype ? `<span class="s-tag">${item.subtype}</span>` : ''}
+          ${item.remote ? `<span class="s-tag remote">${item.remote}</span>` : ''}
+          ${item.experimental && item.type !== 'experimental' ? `<span class="s-tag exp">實驗教育</span>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  if (items.length > max) {
+    el.innerHTML += `<div class="empty-state">顯示前 ${max} 筆，共 ${items.length} 筆</div>`;
+  }
+}
+
+window.selectCity = function(city) {
+  document.getElementById('citySelect').value = city;
+  currentCity = city;
+  currentDistrict = '';
+  renderDistrictDropdown(city);
+  showCityMarkers(city);
+  const center = CITY_CENTERS[city] || [23.7, 120.96];
+  map.setView(center, 12, { animate: true });
+};
+
+function highlightSidebarItem(idx) {
+  document.querySelectorAll('.school-item.active').forEach(el => el.classList.remove('active'));
+  const el = document.querySelector(`.school-item[data-idx="${idx}"]`);
+  if (el) {
+    el.classList.add('active');
+    // Use scrollIntoView only within the list container to avoid page jump
+    const list = document.getElementById('schoolList');
+    const top = el.offsetTop - list.offsetTop;
+    list.scrollTo({ top: top - 60, behavior: 'smooth' });
+  }
+}
+
+window.panToMarker = function(idx) {
+  const item = sidebarItems[idx];
+  // If in city overview mode (no currentCity), switch to the item's city first
+  if (!currentCity && item && item.city) {
+    currentCity = item.city;
+    document.getElementById('citySelect').value = item.city;
+    renderDistrictDropdown(item.city);
+    const cityItems = getFilteredItems(item.city, '');
+    renderMarkers(cityItems);
+    updateSidebar(cityItems);
+    const center = CITY_CENTERS[item.city] || [23.7, 120.96];
+    map.setView(center, 12, { animate: false });
+    // Find the new index for this item and pan to it
+    const newIdx = sidebarItems.indexOf(item);
+    setTimeout(function() {
+      markerGroup.eachLayer(layer => {
+        if (layer._eduIdx === newIdx) {
+          highlightSidebarItem(newIdx);
+          markerGroup.zoomToShowLayer(layer, function() {
+            layer.openPopup();
+          });
+        }
+      });
+    }, 100);
+    return;
+  }
+  let found = false;
+  markerGroup.eachLayer(layer => {
+    if (found) return;
+    if (layer._eduIdx === idx) {
+      found = true;
+      // On mobile, scroll to map first then zoom
+      if (window.innerWidth <= 768) {
+        document.getElementById('map').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(function() {
+          highlightSidebarItem(idx);
+          markerGroup.zoomToShowLayer(layer, function() {
+            layer.openPopup();
+          });
+        }, 350);
+      } else {
+        highlightSidebarItem(idx);
+        markerGroup.zoomToShowLayer(layer, function() {
+          layer.openPopup();
+        });
+      }
+    }
+  });
+};
+
+// === Filter ===
+document.getElementById('filterBar').addEventListener('click', function(e) {
+  const chip = e.target.closest('.filter-chip');
+  if (!chip) return;
+  const f = chip.dataset.filter;
+  const allChip = document.querySelector('.filter-chip[data-filter="all"]');
+  if (f === 'all') {
+    // "全部" resets everything
+    currentFilters = new Set(['all']);
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    allChip.classList.add('active');
+  } else {
+    // Toggle this chip
+    if (currentFilters.has(f)) {
+      currentFilters.delete(f);
+      chip.classList.remove('active');
+    } else {
+      currentFilters.add(f);
+      chip.classList.add('active');
+    }
+    // Remove "all" when specific filters are selected
+    currentFilters.delete('all');
+    allChip.classList.remove('active');
+    // If nothing selected, revert to "all"
+    if (currentFilters.size === 0) {
+      currentFilters.add('all');
+      allChip.classList.add('active');
+    }
+  }
+  // Refresh view
+  const headerQuery = document.getElementById('searchInput').value.trim();
+  const sidebarQuery = document.getElementById('sidebarSearchInput').value.trim();
+  const query = headerQuery || sidebarQuery;
+  if (query) {
+    if (!headerQuery && sidebarQuery) {
+      document.getElementById('searchInput').value = sidebarQuery;
+    }
+    doSearch(query);
+    return;
+  }
+  if (currentCity) {
+    if (currentDistrict) {
+      showDistrictMarkers(currentCity, currentDistrict);
+    } else {
+      showCityMarkers(currentCity);
+    }
+  } else {
+    showCityOverview();
+  }
+});
+
+// === Search ===
+document.getElementById('searchInput').addEventListener('input', function() {
+  clearTimeout(searchTimeout);
+  const query = this.value.trim();
+  if (!query) {
+    if (currentCity) {
+      if (currentDistrict) showDistrictMarkers(currentCity, currentDistrict);
+      else showCityMarkers(currentCity);
+    } else {
+      showCityOverview();
+    }
+    return;
+  }
+  searchTimeout = setTimeout(() => doSearch(query), 300);
+});
+
+function doSearch(query) {
+  const q = query.toLowerCase().replace(/台/g, '臺');
+  const matchQ = item => (item.name && item.name.toLowerCase().includes(q)) || (item.address && item.address.toLowerCase().includes(q));
+
+  // Use getFilteredItems logic + matchQ
+  const allItems = getFilteredItems(currentCity, currentDistrict);
+  let results = allItems.filter(matchQ).slice(0, 200);
+
+  if (results.length > 0) {
+    renderMarkers(results);
+    updateSidebar(results);
+    const coords = results.map(r => getCoords(r));
+    if (coords.length === 1) {
+      map.setView(coords[0], 15, { animate: true });
+    } else {
+      map.fitBounds(L.latLngBounds(coords), { padding: [40, 40], animate: true });
+    }
+    const isAll = currentFilters.has('all');
+    const filterLabel = isAll ? '' : ' · ' + [...currentFilters].map(f => TYPE_LABELS[f] || f).join(' · ');
+    document.getElementById('sidebarTitle').textContent = `搜尋「${query}」${filterLabel}`;
+  } else {
+    markerGroup.clearLayers();
+    updateSidebar([]);
+    document.getElementById('schoolList').innerHTML = '<div class="empty-state">沒有找到符合的結果</div>';
+  }
+}
+
+// === Mobile sidebar toggle ===
+document.getElementById('sidebarHeader').addEventListener('click', function(e) {
+  if (window.innerWidth <= 768) {
+    e.stopPropagation();
+    document.getElementById('sidebar').classList.toggle('open');
+  }
+});
+
+// === Mobile filter panel ===
+document.getElementById('eduFilterToggle').addEventListener('click', function(e) {
+  e.stopPropagation();
+  document.getElementById('eduFilterPanel').classList.toggle('show');
+  this.classList.toggle('open');
+});
+document.getElementById('eduFilterPanel').addEventListener('click', function(e) {
+  e.stopPropagation();
+  const chip = e.target.closest('.filter-chip');
+  if (!chip) return;
+  const f = chip.dataset.filter;
+  // Toggle filter directly
+  if (currentFilters.has(f)) {
+    currentFilters.delete(f);
+  } else {
+    currentFilters.add(f);
+  }
+  currentFilters.delete('all');
+  if (currentFilters.size === 0) currentFilters.add('all');
+  // Sync all chip active states
+  document.querySelectorAll('.filter-chip').forEach(c => {
+    c.classList.toggle('active', currentFilters.has(c.dataset.filter));
+  });
+  updateEduFilterTags();
+  // Refresh view
+  const query = document.getElementById('searchInput').value.trim();
+  if (query) {
+    doSearch(query);
+  } else if (currentCity) {
+    if (currentDistrict) { showDistrictMarkers(currentCity, currentDistrict); }
+    else { showCityMarkers(currentCity); }
+  } else {
+    showCityOverview();
+  }
+});
+document.getElementById('eduFilterTags').addEventListener('click', function(e) {
+  const tag = e.target.closest('.filter-active-tag');
+  if (!tag) return;
+  const f = tag.dataset.filter;
+  currentFilters.delete(f);
+  if (currentFilters.size === 0) currentFilters.add('all');
+  // Sync all chips
+  document.querySelectorAll(`.filter-chip[data-filter="${f}"]`).forEach(c => c.classList.remove('active'));
+  if (currentFilters.has('all')) document.querySelectorAll('.filter-chip[data-filter="all"]').forEach(c => c.classList.add('active'));
+  updateEduFilterTags();
+  if (currentCity) {
+    if (currentDistrict) { showDistrictMarkers(currentCity, currentDistrict); }
+    else { showCityMarkers(currentCity); }
+  } else { showCityOverview(); }
+});
+document.getElementById('eduFilterReset').addEventListener('click', function() {
+  currentFilters = new Set(['all']);
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  document.querySelectorAll('.filter-chip[data-filter="all"]').forEach(c => c.classList.add('active'));
+  updateEduFilterTags();
+  if (currentCity) { showCityMarkers(currentCity); } else { showCityOverview(); }
+});
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.filter-bar')) {
+    document.getElementById('eduFilterPanel').classList.remove('show');
+    document.getElementById('eduFilterToggle').classList.remove('open');
+  }
+});
+
+function updateEduFilterTags() {
+  const container = document.getElementById('eduFilterTags');
+  const resetBtn = document.getElementById('eduFilterReset');
+  if (currentFilters.has('all') || currentFilters.size === 0) {
+    container.innerHTML = '<span style="font-size:11px;color:var(--text-secondary)">全部類型</span>';
+    resetBtn.classList.remove('show');
+  } else {
+    container.innerHTML = [...currentFilters].map(f =>
+      `<span class="filter-active-tag" data-filter="${f}">${TYPE_LABELS[f]||f} <span class="tag-x">✕</span></span>`
+    ).join('');
+    resetBtn.classList.add('show');
+  }
+  // Sync panel chips
+  document.querySelectorAll('#eduFilterPanel .filter-chip').forEach(c => {
+    c.classList.toggle('active', currentFilters.has(c.dataset.filter));
+  });
+}
+
+// === Mobile tab bar ===
+document.getElementById('eduTabBar').addEventListener('click', function(e) {
+  const tab = e.target.closest('.edu-tab');
+  if (!tab) return;
+  const action = tab.dataset.action;
+  document.querySelectorAll('.edu-tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  if (action === 'map') {
+    document.getElementById('eduFilterPanel').classList.remove('show');
+    document.getElementById('eduFilterToggle').classList.remove('open');
+    setTimeout(() => map.invalidateSize(), 100);
+  }
+  if (action === 'city') {
+    // Show city list in sidebar
+    const el = document.getElementById('schoolList');
+    document.getElementById('sidebarTitle').textContent = '選擇縣市';
+    document.getElementById('sidebarCount').textContent = '';
+    el.innerHTML = DATA.cityOrder.map(city => {
+      if (!DATA.cityIndex[city]) return '';
+      const districts = DATA.cityIndex[city];
+      const total = Object.values(districts).reduce((s,d) => s + (d.kindergarten||0) + (d.elementary||0) + (d.junior||0) + (d.high||0) + (d.university||0) + (d.experimental||0) + (d.special||0) + (d.cram||0), 0);
+      return `<div class="school-item" style="cursor:pointer" data-city="${city}">
+        <div class="s-info"><div class="s-name">${city}</div><div class="s-addr">${total} 校</div></div>
+      </div>`;
+    }).join('');
+    el.querySelectorAll('.school-item[data-city]').forEach(item => {
+      item.addEventListener('click', function() {
+        const city = this.dataset.city;
+        document.getElementById('citySelect').value = city;
+        currentCity = city;
+        currentDistrict = '';
+        renderDistrictDropdown(city);
+        showCityMarkers(city);
+        const center = CITY_CENTERS[city] || [23.7, 120.96];
+        map.setView(center, 12, { animate: true });
+        document.querySelectorAll('.edu-tab').forEach(t => t.classList.remove('active'));
+        document.querySelector('.edu-tab[data-action="map"]').classList.add('active');
+      });
+    });
+    document.getElementById('sidebar').classList.add('open');
+  }
+  if (action === 'about') {
+    const el = document.getElementById('schoolList');
+    document.getElementById('sidebarTitle').textContent = '關於';
+    document.getElementById('sidebarCount').textContent = '';
+    el.innerHTML = `<div style="padding:20px;font-size:13px;line-height:1.8;color:var(--text-secondary)">
+      <h3 style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:12px">台灣教育資源地圖</h3>
+      <p>收錄全台 ${DATA ? DATA.schools.length.toLocaleString() : '-'} 所學校、${DATA ? DATA.libraries.length : '-'} 間圖書館、${DATA ? DATA.museums.length : '-'} 座博物館、${DATA ? (DATA.sports||[]).length.toLocaleString() : '-'} 座運動場館、${DATA ? (DATA.infant||[]).length.toLocaleString() : '-'} 間托嬰中心。</p>
+      <p style="margin-top:12px"><strong>資料來源</strong><br>教育部統計處、內政部、文化部、體育署、衛福部、農業部、各縣市政府開放資料</p>
+      <p style="margin-top:12px"><strong>更新時間</strong><br>${DATA ? DATA.updatedAt || '-' : '-'}</p>
+      <p style="margin-top:12px"><strong>功能說明</strong></p>
+      <ul style="padding-left:20px;margin-top:4px">
+        <li>支援 15 種教育資源類型篩選</li>
+        <li>幼兒園裁罰紀錄查詢</li>
+        <li>娃娃車登記查詢</li>
+        <li>全台 22 縣市行政區瀏覽</li>
+      </ul>
+    </div>`;
+    document.getElementById('sidebar').classList.add('open');
+  }
+});
+
+// === Start ===
+init();
+
+})();
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "台灣教育資源地圖",
+  "alternateName": "Taiwan Education Resource Map",
+  "description": "在地圖上搜尋全台學校與圖書館資訊",
+  "url": "https://storage.googleapis.com/upliftorch_tool/edu-map/"
+}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"首頁","item":"https://upliftorch.com/"},{"@type":"ListItem","position":2,"name":"免費線上工具","item":"https://upliftorch.com/tools"},{"@type":"ListItem","position":3,"name":"台灣教育資源地圖","item":"https://upliftorch.com/tools/edu-map/"}]}
+</script>
+
+<script>document.querySelectorAll(".current-year").forEach(function (el) { el.textContent = new Date().getFullYear(); });</script>
+
+<footer class="open-source-attribution" style="padding:24px;text-align:center"><a href="https://upliftorch.com/">Upliftorch</a> · <a href="https://upliftorch.com/tools/edu-map/">Official demo / 線上工具</a></footer>
+</body>
+</html>
